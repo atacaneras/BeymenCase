@@ -154,6 +154,29 @@ services:
       - beymen-network
     restart: on-failure
 
+  # Frontend
+  frontend:
+    image: node:18-alpine
+    container_name: beymen-frontend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    command: sh -c "npm install && npm start"
+    environment:
+      - REACT_APP_API_BASE=http://localhost:5001
+      - REACT_APP_STOCK_API=http://localhost:5002
+      - REACT_APP_NOTIFICATION_API=http://localhost:5003
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      - beymen-network
+    restart: on-failure
+    depends_on:
+      - order-service
+      - stock-service
+      - notification-service
+
 volumes:
   order-data:
   stock-data:
