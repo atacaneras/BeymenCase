@@ -1,0 +1,164 @@
+services:
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: beymen-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - beymen-network
+
+  # PostgreSQL - Order Database
+  postgres-order:
+    image: postgres:15
+    container_name: beymen-postgres-order
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: OrderDb
+      POSTGRES_USER: orderuser
+      POSTGRES_PASSWORD: orderpass123
+    volumes:
+      - order-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderuser -d OrderDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beymen-network
+
+  # PostgreSQL - Stock Database
+  postgres-stock:
+    image: postgres:15
+    container_name: beymen-postgres-stock
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: StockDb
+      POSTGRES_USER: stockuser
+      POSTGRES_PASSWORD: stockpass123
+    volumes:
+      - stock-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockuser -d StockDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beymen-network
+
+  # PostgreSQL - Notification Database
+  postgres-notification:
+    image: postgres:15
+    container_name: beymen-postgres-notification
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: NotificationDb
+      POSTGRES_USER: notificationuser
+      POSTGRES_PASSWORD: notificationpass123
+    volumes:
+      - notification-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notificationuser -d NotificationDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beymen-network
+
+  # Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: OrderService/Dockerfile
+    container_name: beymen-order-service
+    ports:
+      - "5001:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-order;Database=OrderDb;Username=orderuser;Password=orderpass123
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=admin
+      - RabbitMQ__Password=admin123
+      - RabbitMQ__Port=5672
+      - Services__StockService=http://stock-service
+      - Services__NotificationService=http://notification-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres-order:
+        condition: service_healthy
+    networks:
+      - beymen-network
+    restart: on-failure
+
+  # Stock Service
+  stock-service:
+    build:
+      context: .
+      dockerfile: StockService/Dockerfile
+    container_name: beymen-stock-service
+    ports:
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-stock;Database=StockDb;Username=stockuser;Password=stockpass123
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=admin
+      - RabbitMQ__Password=admin123
+      - RabbitMQ__Port=5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres-stock:
+        condition: service_healthy
+    networks:
+      - beymen-network
+    restart: on-failure
+
+  # Notification Service
+  notification-service:
+    build:
+      context: .
+      dockerfile: NotificationService/Dockerfile
+    container_name: beymen-notification-service
+    ports:
+      - "5003:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-notification;Database=NotificationDb;Username=notificationuser;Password=notificationpass123
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=admin
+      - RabbitMQ__Password=admin123
+      - RabbitMQ__Port=5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+    networks:
+      - beymen-network
+    restart: on-failure
+
+volumes:
+  order-data:
+  stock-data:
+  notification-data:
+
+networks:
+  beymen-network:
+    driver: bridge

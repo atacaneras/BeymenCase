@@ -1,0 +1,5 @@
+@'
+**/bin/
+**/obj/
+**/.vs/
+'@ | Set-Content -Path .dockerignore -Encoding UTF8
