@@ -89,7 +89,9 @@ namespace StockService.Services
                         return false;
                     }
 
+                    // Mevcut kullanılabilir stok: Toplam Stok - Rezerve Edilmiş Stok
                     var availableStock = product.StockQuantity - product.ReservedQuantity;
+
                     if (availableStock < item.Quantity)
                     {
                         _logger.LogWarning(
@@ -99,7 +101,9 @@ namespace StockService.Services
                         return false;
                     }
 
-                    product.StockQuantity -= item.Quantity;
+                    // KRİTİK DEĞİŞİKLİK: StockQuantity'yi düşürmek yerine, ReservedQuantity'yi artırıyoruz.
+                    // Böylece StockQuantity ilk oluşturulan değerinde kalır.
+                    product.ReservedQuantity += item.Quantity;
                     product.UpdatedAt = DateTime.UtcNow;
 
                     // İşlem kaydı oluştur
@@ -110,19 +114,19 @@ namespace StockService.Services
                         Quantity = item.Quantity,
                         Type = StockTransactionType.Sale,
                         CreatedAt = DateTime.UtcNow,
-                        Notes = $"{request.OrderId} siparişi için stok azaltıldı"
+                        Notes = $"{request.OrderId} siparişi için stok rezerve edildi" // Not güncellendi
                     };
 
                     _context.StockTransactions.Add(stockTransaction);
                     await _productRepository.UpdateAsync(product);
 
                     _logger.LogInformation(
-                        "Ürün {ProductId} için stok güncellendi. Yeni miktar: {Quantity}",
-                        product.Id, product.StockQuantity);
+                        "Ürün {ProductId} için stok rezerve edildi. Rezerve edilen miktar: {ReservedQuantity}",
+                        product.Id, product.ReservedQuantity);
                 }
 
                 await transaction.CommitAsync();
-                _logger.LogInformation("{OrderId} siparişi için stok güncellemesi başarıyla tamamlandı", request.OrderId);
+                _logger.LogInformation("{OrderId} siparişi için stok güncellemesi (rezervasyonu) başarıyla tamamlandı", request.OrderId);
                 return true;
             }
             catch (Exception ex)
@@ -189,6 +193,7 @@ namespace StockService.Services
                 Price = product.Price,
                 StockQuantity = product.StockQuantity,
                 ReservedQuantity = product.ReservedQuantity,
+                // Kullanılabilir Miktar = Toplam Stok - Rezerve Miktar
                 AvailableQuantity = product.StockQuantity - product.ReservedQuantity
             };
         }

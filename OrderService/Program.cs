@@ -8,10 +8,25 @@ using RabbitMQ.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CORS Politikasý Adý
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
 // Servisleri ekle
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// CORS Tanýmlamasý: Frontend adresinden gelen isteklere izin veriyoruz
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins,
+                      policy =>
+                      {
+                          policy.WithOrigins("http://localhost:3001")
+                                .AllowAnyHeader()
+                                .AllowAnyMethod();
+                      });
+});
 
 // Veritabaný
 builder.Services.AddDbContext<OrderDbContext>(options =>
@@ -142,6 +157,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// CORS Middleware'ini etkinleþtirin
+app.UseCors(MyAllowSpecificOrigins);
 
 app.MapControllers();
 app.Run();

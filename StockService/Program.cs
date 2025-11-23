@@ -8,9 +8,24 @@ using StockService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CORS Politikası Adı
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// CORS Tanımlaması: Frontend adresinden gelen isteklere izin veriyoruz
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins,
+                      policy =>
+                      {
+                          policy.WithOrigins("http://localhost:3001")
+                                .AllowAnyHeader()
+                                .AllowAnyMethod();
+                      });
+});
 
 // Veritabanı
 builder.Services.AddDbContext<StockDbContext>(options =>
@@ -68,6 +83,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// CORS Middleware'ini etkinleştirin
+app.UseCors(MyAllowSpecificOrigins);
 
 app.MapControllers();
 app.Run();
